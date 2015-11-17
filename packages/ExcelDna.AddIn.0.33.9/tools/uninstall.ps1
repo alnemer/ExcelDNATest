@@ -1,6 +1,8 @@
 param($installPath, $toolsPath, $package, $project)
-write-host "Starting Excel-DNA uninstall script"
+write-host "Starting ExcelDna.AddIn uninstall script"
 
+$dteVersion = $project.DTE.Version
+$isBeforeVS2015 = ($dteVersion -lt 14.0)
 $projName = $project.Name
 $isFSharp = ($project.Type -eq "F#")
 
@@ -24,7 +26,7 @@ if ($null -ne $dnaFileItem)
         }
         $dnaFileItem.Name = "_UNINSTALLED_${suffix}_${dnaFileName}"
     }
-    if ($isFSharp)
+    if ($isFSharp -and $isBeforeVS2015)
     {
         $dnaFileItem.Properties.Item("BuildAction").Value = ([Microsoft.VisualStudio.FSharp.ProjectSystem.BuildAction]::None)
     }
@@ -38,7 +40,9 @@ if ($null -ne $dnaFileItem)
 
 # Remove post-build command
 $postBuildCheck = "ExcelDna.xll`""
-$postBuildCheck2 = "ExcelDnaPack.exe`""
+$postBuildCheck2 = "ExcelDna64.xll`""
+$postBuildCheck3 = "-AddIn64.dna*`""
+$postBuildCheck4 = "ExcelDnaPack.exe`""
 $prop = $project.Properties.Item("PostBuildEvent")
 if ($prop.Value -eq "") 
 {
@@ -52,7 +56,7 @@ else
 	$dessert = ""
 	foreach ($scoop in $banana) 
     {
-	   if (!($scoop.Contains($postBuildCheck)) -and !($scoop.Contains($postBuildCheck2))) 
+	   if (!($scoop.Contains($postBuildCheck)) -and !($scoop.Contains($postBuildCheck2)) -and !($scoop.Contains($postBuildCheck3)) -and !($scoop.Contains($postBuildCheck4))) 
        {
            # Keep this scoop
 	       $dessert = "$dessert$scoop`n"
@@ -62,15 +66,16 @@ else
 #	write-host 'Removed .xll copy post-build event'
 }
 
-if (!$isFSharp)
+if ($isFSharp -and $isBeforeVS2015)
+{
+    # No Debug information was set.
+}
+else
 {
     # Clean Debug settings
     $exeValue = Get-ItemProperty -Path Registry::HKEY_CLASSES_ROOT\Excel.XLL\shell\Open\command -name "(default)"
-    if ($exeValue -match "`".*`"")
+    if ($exeValue -match "EXCEL\.EXE")
     {
-        $exePath = $matches[0] -replace "`"", ""
-        # Write-Host "Excel path found: " $exePath
-        
         # Find Debug configuration and set debugger settings.
         $debugProject = $project.ConfigurationManager | Where-Object {$_.ConfigurationName -eq "Debug"}
         if ($null -ne $debugProject)
@@ -87,4 +92,4 @@ if (!$isFSharp)
     }
 }
 
-Write-Host "Completed Excel-DNA uninstall script"
+Write-Host "Completed ExcelDna.AddIn uninstall script"
